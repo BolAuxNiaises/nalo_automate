@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - Automate Nalo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+        }
+        .card { 
+            background: rgba(255,255,255,0.95); 
+            backdrop-filter: blur(10px); 
+            border: none; 
+            border-radius: 20px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); 
+        }
+        .header { 
+            color: white; 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .stat-card { 
+            background: linear-gradient(45deg, #667eea, #764ba2); 
+            color: white; 
+            padding: 25px; 
+            border-radius: 15px; 
+            text-align: center; 
+            margin-bottom: 20px;
+        }
+        .stat-card h3 { 
+            margin: 0 0 10px 0; 
+            font-size: 1.1em; 
+        }
+        .stat-card h2 { 
+            margin: 0; 
+            font-size: 2.2em; 
+            font-weight: bold;
+        }
+        .flavor-card { 
+            border: 2px solid #e9ecef; 
+            padding: 20px; 
+            border-radius: 15px; 
+            background: white; 
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .flavor-card:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .flavor-card.empty { 
+            border-color: #dc3545; 
+            background: #fff5f5;
+        }
+        .flavor-card.low { 
+            border-color: #ffc107; 
+            background: #fffbf0;
+        }
+        .stock-bar { 
+            width: 100%; 
+            height: 20px; 
+            background: #e9ecef; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            margin: 15px 0;
+        }
+        .stock-fill { 
+            height: 100%; 
+            background: #28a745; 
+            transition: width 0.3s ease;
+        }
+        .stock-fill.empty { 
+            background: #dc3545;
+        }
+        .stock-fill.low { 
+            background: #ffc107;
+        }
+        .status-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .status-ok { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        .status-warning { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
+        .status-danger { 
+            background: #f8d7da; 
+            color: #721c24; 
+        }
+        .btn-refill {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-refill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+            color: white;
+        }
+        .btn-refill:disabled {
+            background: #6c757d;
+            transform: none;
+            box-shadow: none;
+        }
+        .orders-table {
+            background: white;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="header">
+            <h1 class="display-5 fw-bold"><i class="fas fa-chart-line"></i> Administration</h1>
+            <p class="lead">Recettes, stocks et gestion de l'automate</p>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <h3><i class="fas fa-euro-sign"></i> Recettes totales</h3>
+                    <h2>{{ total_revenue }}€</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <h3><i class="fas fa-shopping-cart"></i> Commandes</h3>
+                    <h2>{{ total_orders }}</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <h3><i class="fas fa-ice-cream"></i> Parfums</h3>
+                    <h2>{{ flavors.count }}</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Pots vides</h3>
+                    <h2>{{ empty_pots_count }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gestion des stocks -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-warehouse"></i> Taux de remplissage des pots</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for flavor in flavors %}
+                    <div class="col-lg-6 col-xl-4">
+                        <div class="flavor-card {% if flavor.is_empty %}empty{% elif flavor.stock < 10 %}low{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="mb-1">{{ flavor.get_name_display }}</h5>
+                                    <p class="text-muted mb-0">{{ flavor.stock }}/40 boules</p>
+                                </div>
+                                <span class="status-badge {% if flavor.is_empty %}status-danger{% elif flavor.stock < 10 %}status-warning{% else %}status-ok{% endif %}">
+                                    {% if flavor.is_empty %}
+                                        🔴 Vide
+                                    {% elif flavor.stock < 10 %}
+                                        🟡 Faible
+                                    {% else %}
+                                        🟢 OK
+                                    {% endif %}
+                                </span>
+                            </div>
+                            
+                            <div class="stock-bar">
+                                <div class="stock-fill {% if flavor.is_empty %}empty{% elif flavor.stock < 10 %}low{% endif %}" 
+                                    style="width: {{ flavor.fill_rate|stringformat:'.1f' }}%"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">{{ flavor.fill_rate|floatformat:1 }}%</small>
+                                <button class="btn btn-refill" 
+                                        onclick="refillPot({{ flavor.id }}, '{{ flavor.get_name_display }}')"
+                                        {% if flavor.stock == 40 %}disabled title="Pot déjà plein"{% endif %}>
+                                    <i class="fas fa-fill-drip"></i> 
+                                    {% if flavor.stock == 40 %}Plein{% else %}Remplir{% endif %}
+                                </button>
+                            </div>
+                            
+                            {% if flavor.is_empty %}
+                            <div class="alert alert-danger alert-sm mt-3 mb-0 py-2">
+                                <small><i class="fas fa-exclamation-triangle"></i> <strong>Alerte :</strong> Stock épuisé! Email envoyé à l'admin.</small>
+                            </div>
+                            {% elif flavor.stock < 10 %}
+                            <div class="alert alert-warning alert-sm mt-3 mb-0 py-2">
+                                <small><i class="fas fa-exclamation-triangle"></i> <strong>Attention :</strong> Stock faible, remplissage recommandé.</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Commandes récentes -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-history"></i> Commandes récentes</h4>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Code</th>
+                                <th>Date</th>
+                                <th>Boules</th>
+                                <th>Prix</th>
+                                <th>Détails</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in recent_orders %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ order.order_code }}</span></td>
+                                <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                                <td><span class="badge bg-info">{{ order.total_scoops }}</span></td>
+                                <td><strong>{{ order.total_price }}€</strong></td>
+                                <td>
+                                    <small class="text-muted">
+                                        {% for item in order.orderitem_set.all %}
+                                            {{ item.quantity }}× {{ item.flavor.get_name_display }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>Aucune commande pour le moment</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="text-center">
+            <a href="/" class="btn btn-outline-light me-2">← Retour accueil</a>
+            <a href="/api/docs/" class="btn btn-outline-light me-2">📖 API Docs</a>
+            <a href="/admin/" class="btn btn-outline-light">⚙️ Django Admin</a>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function refillPot(flavorId, flavorName) {
+            if (!confirm(`Remplir le pot de ${flavorName} à 40 boules ?\n\nCela enverra un email de confirmation à l'administrateur.`)) {
+                return;
+            }
+            
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            
+            // Feedback visuel
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Remplissage...';
+            
+            try {
+                const response = await fetch('/api/refill-pot/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ flavor_id: flavorId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Success feedback
+                    button.innerHTML = '<i class="fas fa-check"></i> Rempli !';
+                    button.style.background = '#28a745';
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'alert alert-success alert-dismissible fade show mt-3';
+                    successMsg.innerHTML = `
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Succès !</strong> ${data.message}
+                        <br><small>📧 Email de confirmation envoyé à l'administrateur</small>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    button.closest('.flavor-card').appendChild(successMsg);
+                    
+                    // Reload after 2 seconds to update display
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    alert('Erreur: ' + data.error);
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+            } catch (error) {
+                alert('Erreur de connexion: ' + error.message);
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        // Auto-refresh every 30 seconds to keep stock levels updated
+        setInterval(() => {
+            // Only refresh if no modals are open
+            if (!document.querySelector('.modal.show')) {
+                location.reload();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

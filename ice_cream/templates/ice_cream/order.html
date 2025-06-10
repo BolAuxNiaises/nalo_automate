@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commander - Automate Nalo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border: none; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .flavor-card { margin-bottom: 15px; padding: 20px; border: 2px solid #e9ecef; border-radius: 15px; transition: all 0.3s; }
+        .flavor-card:hover { border-color: #007bff; box-shadow: 0 4px 15px rgba(0,123,255,0.2); }
+        .flavor-card.out-of-stock { opacity: 0.5; border-color: #dc3545; }
+        .quantity-control { display: flex; align-items: center; gap: 10px; }
+        .quantity-input { width: 80px; text-align: center; }
+        .btn-quantity { width: 40px; height: 40px; border-radius: 50%; }
+        .total-section { background: #f8f9fa; padding: 20px; border-radius: 15px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header text-center bg-primary text-white">
+                        <h2><i class="fas fa-ice-cream"></i> Créer votre commande</h2>
+                        <p class="mb-0">Sélectionnez vos parfums et quantités</p>
+                    </div>
+                    <div class="card-body">
+                        
+                        <div id="flavors-list">
+                            <!-- Les parfums seront chargés dynamiquement -->
+                        </div>
+                        
+                        <div class="total-section">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h4>Total: <span id="total-price">0</span>€</h4>
+                                    <p class="text-muted mb-0">Prix: 2€ par boule</p>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button id="submit-order" class="btn btn-primary btn-lg" disabled>
+                                        <i class="fas fa-shopping-cart"></i> Commander
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="order-result" class="mt-4" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="/" class="btn btn-outline-light">← Retour accueil</a>
+                    <a href="/retrieve/" class="btn btn-outline-light">Récupérer commande →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedItems = {};
+        let flavors = [];
+
+        // Charger les parfums disponibles
+        async function loadFlavors() {
+            try {
+                const response = await fetch('/api/flavors/');
+                const data = await response.json();
+                flavors = data.flavors;
+                displayFlavors();
+            } catch (error) {
+                console.error('Erreur chargement parfums:', error);
+            }
+        }
+
+        function displayFlavors() {
+            const container = document.getElementById('flavors-list');
+            container.innerHTML = '';
+
+            flavors.forEach(flavor => {
+                const isOutOfStock = flavor.stock === 0;
+                const cardClass = isOutOfStock ? 'flavor-card out-of-stock' : 'flavor-card';
+                
+                const flavorHtml = `
+                    <div class="${cardClass}" data-flavor-id="${flavor.id}">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5>${flavor.display_name}</h5>
+                                <p class="text-muted mb-0">
+                                    Stock: ${flavor.stock} boules disponibles
+                                    ${isOutOfStock ? '<span class="badge bg-danger">Rupture de stock</span>' : ''}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="quantity-control justify-content-end">
+                                    <button class="btn btn-outline-secondary btn-quantity" 
+                                            onclick="updateQuantity(${flavor.id}, -1)"
+                                            ${isOutOfStock ? 'disabled' : ''}>-</button>
+                                    <input type="number" class="form-control quantity-input" 
+                                           id="qty-${flavor.id}" value="0" min="0" max="${flavor.stock}"
+                                           onchange="updateQuantity(${flavor.id}, 0)"
+                                           ${isOutOfStock ? 'disabled' : ''}>
+                                    <button class="btn btn-outline-secondary btn-quantity" 
+                                            onclick="updateQuantity(${flavor.id}, 1)"
+                                            ${isOutOfStock ? 'disabled' : ''}>+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += flavorHtml;
+            });
+        }
+
+        function updateQuantity(flavorId, change) {
+            const input = document.getElementById(`qty-${flavorId}`);
+            const flavor = flavors.find(f => f.id === flavorId);
+            let newValue = parseInt(input.value) + change;
+            
+            newValue = Math.max(0, Math.min(newValue, flavor.stock));
+            input.value = newValue;
+            
+            if (newValue > 0) {
+                selectedItems[flavorId] = newValue;
+            } else {
+                delete selectedItems[flavorId];
+            }
+            
+            updateTotal();
+        }
+
+        function updateTotal() {
+            const total = Object.values(selectedItems).reduce((sum, qty) => sum + (qty * 2), 0);
+            document.getElementById('total-price').textContent = total;
+            
+            const submitBtn = document.getElementById('submit-order');
+            submitBtn.disabled = total === 0;
+        }
+
+        // Soumettre la commande
+        document.getElementById('submit-order').addEventListener('click', async function() {
+            if (Object.keys(selectedItems).length === 0) {
+                alert('Veuillez sélectionner au moins un parfum!');
+                return;
+            }
+            
+            const items = Object.entries(selectedItems).map(([flavorId, quantity]) => ({
+                flavor_id: parseInt(flavorId),
+                quantity: quantity
+            }));
+            
+            try {
+                const response = await fetch('/api/orders/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('order-result').innerHTML = `
+                        <div class="alert alert-success text-center">
+                            <h4>🎉 Commande créée avec succès!</h4>
+                            <div class="mt-3 mb-3">
+                                <div class="badge bg-primary fs-4 p-3">${data.order_code}</div>
+                            </div>
+                            <p><strong>Total: ${data.total_price}€</strong></p>
+                            <p class="text-muted">Notez bien votre code pour récupérer votre commande!</p>
+                            <a href="/retrieve/" class="btn btn-outline-primary">Récupérer ma commande</a>
+                        </div>
+                    `;
+                    document.getElementById('order-result').style.display = 'block';
+                    
+                    // Masquer le formulaire
+                    document.querySelector('.card-body > div:first-child').style.display = 'none';
+                    document.querySelector('.total-section').style.display = 'none';
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur de connexion: ' + error.message);
+            }
+        });
+
+        // Charger les parfums au démarrage
+        loadFlavors();
+    </script>
+</body>
+</html>
