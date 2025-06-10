@@ -1,0 +1,21 @@
+[MASTER]
+load-plugins = pylint_django
+django-settings-module = nalo_automate.settings
+
+[FORMAT]
+max-line-length = 88
+
+[MESSAGES CONTROL]
+disable = 
+    missing-docstring,
+    too-few-public-methods,
+    import-error,
+    no-member,
+    unused-argument
+
+[DESIGN]
+max-args = 7
+max-locals = 15
+max-returns = 6
+max-branches = 12
+max-statements = 50
