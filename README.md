@@ -36,3 +36,41 @@ Un utilisateur a le choix du nombre de boule et des parfums.
 - [ ] Publie-le sur GitHub en tant que `pull-request`
 - [ ] Envoie-nous le lien et dis-nous approximativement combien de temps tu as passé sur ce travail.
 
+# Nalo Ice Cream Automate
+
+Système de gestion d'automate de glaces avec API REST et interface web.
+
+## Installation et lancement
+
+```bash
+# Setup complet (première fois)
+make dev
+
+# Ou étape par étape
+make install  # Installation des dépendances
+make init     # Base de données + parfums
+make run      # Lancement du serveur
+```
+
+Accès : http://127.0.0.1:8000
+
+## Fonctionnalités
+
+* API : `/api/orders/`, `/api/flavors/`, `/api/refill-pot/`
+* Interface : Commande, récupération, administration
+* Documentation : http://127.0.0.1:8000/api/docs/
+
+## Tests et qualité
+
+```bash
+make test
+make test-coverage
+make check
+make clean
+```
+
+## Structure
+
+5 parfums disponibles (Chocolat Orange, Cerise, Pistache, Vanille, Framboise)
+40 boules par pot, 2€ par boule
+Gestion automatique des stocks + alertes
