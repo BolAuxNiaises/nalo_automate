@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Récupérer - Automate Nalo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border: none; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .order-code-input { font-size: 1.5rem; text-align: center; letter-spacing: 3px; font-weight: bold; text-transform: uppercase; }
+        .ice-cream-visual { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px 0; }
+        .scoop { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .chocolate_orange { background: linear-gradient(45deg, #8B4513, #FF8C00); }
+        .cherry { background: linear-gradient(45deg, #DC143C, #FF69B4); }
+        .pistachio { background: linear-gradient(45deg, #9ACD32, #228B22); }
+        .vanilla { background: linear-gradient(45deg, #F5DEB3, #FFE4B5); color: #333; }
+        .raspberry { background: linear-gradient(45deg, #E30B5C, #FF1493); }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header text-center bg-success text-white">
+                        <h2><i class="fas fa-search"></i> Récupérer votre commande</h2>
+                        <p class="mb-0">Entrez votre code de commande</p>
+                    </div>
+                    <div class="card-body">
+                        
+                        <form id="retrieve-form">
+                            <div class="mb-4">
+                                <label for="order-code" class="form-label">Code de commande</label>
+                                <input type="text" class="form-control order-code-input" 
+                                       id="order-code" placeholder="ABC12345" maxlength="8">
+                                <div class="form-text">Code à 8 caractères reçu lors de votre commande</div>
+                            </div>
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-search"></i> Rechercher ma commande
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div id="order-display" class="mt-4" style="display: none;"></div>
+                        <div id="error-display" class="mt-4" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="/" class="btn btn-outline-light">← Retour accueil</a>
+                    <a href="/order/" class="btn btn-outline-light">Nouvelle commande →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('retrieve-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const orderCode = document.getElementById('order-code').value.trim().toUpperCase();
+            
+            if (!orderCode) {
+                showError('Veuillez entrer un code de commande');
+                return;
+            }
+            
+            if (orderCode.length !== 8) {
+                showError('Le code de commande doit contenir 8 caractères');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/orders/${orderCode}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayOrder(data.order);
+                } else {
+                    showError(data.error);
+                }
+            } catch (error) {
+                showError('Erreur de connexion: ' + error.message);
+            }
+        });
+
+        function displayOrder(order) {
+            document.getElementById('error-display').style.display = 'none';
+            
+            // Générer l'affichage visuel des boules
+            let visualHtml = '';
+            order.items.forEach(item => {
+                for (let i = 0; i < item.quantity; i++) {
+                    visualHtml += `<div class="scoop ${item.flavor_code}">${i + 1}</div>`;
+                }
+            });
+            
+            // Détail des parfums
+            let itemsHtml = '';
+            order.items.forEach(item => {
+                itemsHtml += `
+                    <div class="row align-items-center mb-2 p-2 bg-light rounded">
+                        <div class="col-8">
+                            <strong>${item.flavor}</strong>
+                        </div>
+                        <div class="col-4 text-end">
+                            ${item.quantity} × 2€ = ${item.price}€
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('order-display').innerHTML = `
+                <div class="alert alert-success">
+                    <h4 class="text-center mb-4">🍦 Votre commande</h4>
+                    
+                    <div class="text-center mb-4">
+                        <div class="badge bg-success fs-5 p-3">${order.code}</div>
+                    </div>
+                    
+                    <div class="row text-center mb-4">
+                        <div class="col-4">
+                            <strong>Boules</strong><br>
+                            <span class="fs-4">${order.total_scoops}</span>
+                        </div>
+                        <div class="col-4">
+                            <strong>Prix</strong><br>
+                            <span class="fs-4">${order.total_price}€</span>
+                        </div>
+                        <div class="col-4">
+                            <strong>Date</strong><br>
+                            <small>${order.created_at}</small>
+                        </div>
+                    </div>
+                    
+                    <h6>🎨 Représentation graphique de votre glace :</h6>
+                    <div class="ice-cream-visual">
+                        ${visualHtml}
+                    </div>
+                    
+                    <h6>📋 Détail de la commande :</h6>
+                    ${itemsHtml}
+                </div>
+            `;
+            
+            document.getElementById('order-display').style.display = 'block';
+        }
+
+        function showError(message) {
+            document.getElementById('order-display').style.display = 'none';
+            
+            document.getElementById('error-display').innerHTML = `
+                <div class="alert alert-danger text-center">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Erreur:</strong> ${message}
+                </div>
+            `;
+            document.getElementById('error-display').style.display = 'block';
+        }
+
+        // Auto-format du code de commande
+        document.getElementById('order-code').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+    </script>
+</body>
+</html>
